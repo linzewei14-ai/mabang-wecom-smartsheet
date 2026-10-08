@@ -1,0 +1,88 @@
+# ============================================================
+# 马帮 ERP 昨日订单 -> 企业微信智能表格
+# 复制为 config.yaml 后修改。config.yaml 已在 .gitignore 中
+# 所有凭证建议走环境变量 / GitHub Secrets，不要写死在这里
+# ============================================================
+
+mabang:
+  # 官方网关（v2 推荐）。v1 老网关是 http://openapi.mabangerp.com
+  base_url: "https://gwapi.mabangerp.com/api/v2"
+  api_version: v2                # v2 | v1
+
+  api_name: get-order-list       # 新版可用 order-get-order-list-new（游标分页）
+
+  # 用哪个时间字段作为「出单时间」做筛选
+  #   paidtime    付款时间（最接近业务上的「出单」）
+  #   createDate  下单创建时间
+  #   expressTime 发货时间
+  #   updateTime  最后修改时间
+  time_field: paidtime
+
+  # 订单状态：1待处理 2配货中 3已发货 4已完成 5已作废 6所有未发货 7所有非未发货
+  # 6 + 7 的并集 = 除已作废外的全部订单（脚本会自动按订单号去重）
+  statuses: ["6", "7"]
+
+  # 1正常订单 2异常订单 3全部订单
+  can_send: "3"
+
+  # 只取某个店铺，留空 = 全部店铺
+  shop_name: ""
+
+  # 查询窗口：yesterday = [昨天00:00:00, 今天00:00:00]（正好 24 小时，兼容马帮的窗口限制）
+  #          last24h   = [现在-24小时, 现在]
+  window: yesterday
+
+  # 二次过滤：只保留出单时间落在窗口内的行，防止接口放宽范围后混入今天的数据
+  filter_to_target: true
+
+  # 尝试把 shopId 换成店铺名称（失败会自动降级为直接用 shopId，不影响主流程）
+  resolve_shop_name: true
+  shop_api_name: get-shop-list
+
+  # 这两个值请放 GitHub Secrets：MABANG_APPKEY / MABANG_SECRET
+  appkey: ""
+  secret: ""
+
+# ---------- 写入企业微信智能表格 ----------
+smartsheet:
+  # 走 GitHub Secrets：SMARTSHEET_WEBHOOK_KEY
+  # 获取路径：打开智能表格 -> 右上角「...」或工作表三个点 -> 接收外部数据
+  #          -> 开始配置 -> 复制 Webhook 地址（只需要 key= 后面那串）
+  webhook_key: ""
+
+  # 可选：完整 Webhook 地址。填了它就会覆盖上面的 key（一般用不到，自建网关时才需要）
+  webhook_url: ""
+
+  # 群里那条通知消息末尾附的表格链接
+  sheet_url: ""
+
+  # 字段映射：source 是脚本内部字段名（不要改），target 填智能表格里的字段 ID 或字段标题
+  # 字段 ID 怎么找：智能表格「接收外部数据」配置页里会给出「示例数据」，里面的 key 就是字段 ID
+  #
+  # 💡 这 5 个 target 也可以在 GitHub 网页上配成 Variables，不用改这个文件：
+  #    SS_COL_ORDER_NO / SS_COL_SKU / SS_COL_QTY / SS_COL_TIME / SS_COL_SHOP
+  #    环境变量优先级高于这里的值。
+  #
+  # 💡 不确定哪个 ID 对应哪一列？跑 python tools/setup_wizard.py --probe
+  columns:
+    - source: order_no
+      target: "订单号字段ID"
+      type: text
+    - source: sku
+      target: "SKU字段ID"
+      type: text
+    - source: quantity
+      target: "产品数量字段ID"
+      type: number
+    - source: order_time
+      target: "出单时间字段ID"
+      type: date
+    - source: shop_name
+      target: "店铺名称字段ID"
+      type: text
+
+# ---------- 群消息通知（可选）----------
+notify:
+  # 走 GitHub Secrets：WECOM_BOT_KEY
+  # 企业微信内部群 -> 右上角「...」-> 消息推送 -> 添加 -> 复制 Webhook 里的 key
+  wecom_bot_key: ""
